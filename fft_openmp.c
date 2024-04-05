@@ -12,9 +12,12 @@
 typedef double complex ComplexData;
 
 // Your FFT function declaration
+
 void fft(ComplexData *a, int n, bool invert) {
-    // Original bit-reversal section without OpenMP parallelization
-    for (int i = 1, j = 0; i < n; i++) {
+    int i, j, len;
+    
+    // Bit-reversal section remains unchanged but outside the parallel region
+    for (i = 1, j = 0; i < n; i++) {
         int bit = n >> 1;
         for (; j & bit; bit >>= 1)
             j ^= bit;
@@ -26,29 +29,34 @@ void fft(ComplexData *a, int n, bool invert) {
             a[j] = temp;
         }
     }
+    
+    // Start a single parallel region
+    #pragma omp parallel private(i, j, len)
+    {
+        // Parallelized FFT computation sections
+        for (len = 2; len <= n; len <<= 1) {
+            double ang = 2 * M_PI / len * (invert ? -1 : 1);
+            ComplexData wlen = cexp(I * ang);
 
-    // Parallelized FFT computation sections
-    for (int len = 2; len <= n; len <<= 1) {
-        double ang = 2 * M_PI / len * (invert ? -1 : 1);
-        ComplexData wlen = cexp(I * ang);
-        
-        #pragma omp parallel for
-        for (int i = 0; i < n; i += len) {
-            ComplexData w = 1.0;
-            for (int j = 0; j < len / 2; j++) {
-                ComplexData u = a[i + j];
-                ComplexData v = a[i + j + len / 2] * w;
-                a[i + j] = u + v;
-                a[i + j + len / 2] = u - v;
-                w *= wlen;
+            #pragma omp for
+            for (i = 0; i < n; i += len) {
+                ComplexData w = 1.0;
+                for (j = 0; j < len / 2; j++) {
+                    ComplexData u = a[i + j];
+                    ComplexData v = a[i + j + len / 2] * w;
+                    a[i + j] = u + v;
+                    a[i + j + len / 2] = u - v;
+                    w *= wlen;
+                }
             }
         }
-    }
 
-    if (invert) {
-        #pragma omp parallel for
-        for (int i = 0; i < n; i++)
-            a[i] /= n;
+        // Inverse FFT normalization, if necessary
+        if (invert) {
+            #pragma omp for
+            for (i = 0; i < n; i++)
+                a[i] /= n;
+        }
     }
 }
 
