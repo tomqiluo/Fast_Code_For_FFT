@@ -48,7 +48,7 @@ void fft(ComplexData *a, int n, bool invert) {
 // Function to generate complex data
 void generateComplexData(ComplexData *a, int n) {
     for (int i = 0; i < n; ++i) {
-        a[i] = (rand() / (ComplexData)RAND_MAX) + 
+        a[i] = 
                (rand() / (ComplexData)RAND_MAX) * I;
     }
 }
