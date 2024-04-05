@@ -6,6 +6,8 @@
 #include <math.h>
 #include <omp.h>
 
+#define M_PI 3.14159265358979323846
+
 // Assume ComplexData is defined as:
 typedef double complex ComplexData;
 
