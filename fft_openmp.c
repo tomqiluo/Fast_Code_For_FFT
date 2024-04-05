@@ -13,7 +13,7 @@ typedef double complex ComplexData;
 
 // Your FFT function declaration
 void fft(ComplexData *a, int n, bool invert) {
-    #pragma omp parallel for
+    // Original bit-reversal section without OpenMP parallelization
     for (int i = 1, j = 0; i < n; i++) {
         int bit = n >> 1;
         for (; j & bit; bit >>= 1)
@@ -27,6 +27,7 @@ void fft(ComplexData *a, int n, bool invert) {
         }
     }
 
+    // Parallelized FFT computation sections
     for (int len = 2; len <= n; len <<= 1) {
         double ang = 2 * M_PI / len * (invert ? -1 : 1);
         ComplexData wlen = cexp(I * ang);
