@@ -1,8 +1,12 @@
 # Fast_Code_For_FFT
-Compile fft.c
+There are three main scripts: fft.c, fft_openmp.c, fft_cuda.cu, each contributes
+to run fft function in baseline solution, OpenMP solution and CUDA solution. To compile these files, use the following commands in terminal.
 
-`gcc -std=c99 fft.c -o fft.x -lm`
+Compile fft.c
+`make baseline`
 
 Compile fft_openmp.c
+`make openmp`
 
-`gcc -std=c99 -fopenmp fft_openmp.c -o fft_openmp -lm`
+Compile fft_cuda.cu
+`make cuda`
