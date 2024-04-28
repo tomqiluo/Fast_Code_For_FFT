@@ -5,10 +5,8 @@
 #include <stdbool.h>
 #include <math.h>
 
-// Assume ComplexData is defined as:
 typedef double complex ComplexData;
 
-// Your FFT function declaration
 void fft(ComplexData *a, int n, bool invert) {
     for (int i = 1, j = 0; i < n; i++) {
         int bit = n >> 1;
