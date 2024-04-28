@@ -1,6 +1,8 @@
 {
     "files.associations": {
         "omp.h": "c",
-        "iosfwd": "cpp"
+        "iosfwd": "cpp",
+        "xstring": "cpp",
+        "xutility": "cpp"
     }
 }

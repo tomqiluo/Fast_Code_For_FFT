@@ -33,9 +33,9 @@ __global__ void generateComplexData(cufftDoubleComplex *a, int n, curandState *s
 }
 
 int main() {
-    int sizes[] = {256, 512, 1024, 2048, 4096, 8192, 16384, 32768, 65536, 131072, 262144, 524288, 1048576};
+    int sizes[] = {256, 512, 1024, 2048, 4096, 8192, 16384, 32768, 65536, 131072, 262144, 524288, 1048576, 2097152, 4194304, 8388608};
     int num_sizes = sizeof(sizes) / sizeof(sizes[0]);
-
+    
     for (int i = 0; i < num_sizes; ++i) {
         int n = sizes[i];
         cufftDoubleComplex *data;
