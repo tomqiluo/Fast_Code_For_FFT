@@ -8,6 +8,8 @@
 #include <cuda_runtime.h>
 #include <cuComplex.h>
 
+define BLOCK_SIZE 4096 // Adjust this value based on the GPU
+
 __device__ int reverseBits(int num, int log2n) {
     int reversed = 0;
     for (int i = 0; i < log2n; i++) {
@@ -18,29 +20,14 @@ __device__ int reverseBits(int num, int log2n) {
 }
 
 __global__ void bitReverse(cuDoubleComplex* a, int n, int log2n) {
-    extern __shared__ cuDoubleComplex shared_a[];
-
     int tid = blockIdx.x * blockDim.x + threadIdx.x;
-    int local_id = threadIdx.x;
-
-    // Load data into shared memory
     if (tid < n) {
-        shared_a[local_id] = a[tid];
-    }
-    __syncthreads();
-
-    // Perform bit reversal in shared memory
-    int rev = reverseBits(local_id, log2n);
-    if (local_id < rev) {
-        cuDoubleComplex temp = shared_a[local_id];
-        shared_a[local_id] = shared_a[rev];
-        shared_a[rev] = temp;
-    }
-    __syncthreads();
-
-    // Write data back to global memory
-    if (tid < n) {
-        a[tid] = shared_a[local_id];
+        int rev = reverseBits(tid, log2n);
+        if (tid < rev) {
+            cuDoubleComplex temp = a[tid];
+            a[tid] = a[rev];
+            a[rev] = temp;
+        }
     }
 }
 
@@ -94,11 +81,11 @@ void fft(cuDoubleComplex *h_a, int n, bool invert) {
     cudaMemcpy(d_a, h_a, n * sizeof(cuDoubleComplex), cudaMemcpyHostToDevice);
 
     int log2n = log2((double)n);
-    int blockSize = 4096; // This can be adjusted based on device capabilities
+    int blockSize = BLOCK_SIZE;
     int numBlocks = (n + blockSize - 1) / blockSize;
     size_t sharedSize = blockSize * sizeof(cuDoubleComplex);
 
-    bitReverse<<<numBlocks, blockSize, sharedSize>>>(d_a, n, log2n);
+    bitReverse<<<numBlocks, blockSize>>>(d_a, n, log2n);
     fftKernel<<<numBlocks, blockSize, sharedSize>>>(d_a, n, false);
 
     if (invert) {
