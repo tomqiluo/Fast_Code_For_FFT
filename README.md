@@ -10,3 +10,6 @@ Compile fft_openmp.c
 
 Compile fft_cuda.cu
 `make cuda`
+
+Compile all three
+`make all`
