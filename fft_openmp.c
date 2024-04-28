@@ -107,7 +107,7 @@ int main() {
         gettimeofday(&start, NULL);
         
         // Run FFT
-        fft(data, n, false);
+        fft_omp(data, n, false);
         
         // Measure end time
         gettimeofday(&end, NULL);
