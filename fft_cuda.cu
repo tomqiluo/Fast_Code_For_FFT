@@ -8,7 +8,7 @@
 #include <cuda_runtime.h>
 #include <cuComplex.h>
 
-define BLOCK_SIZE 4096 // Adjust this value based on the GPU
+#define BLOCK_SIZE 4096 // Adjust this value based on the GPU
 
 __device__ int reverseBits(int num, int log2n) {
     int reversed = 0;
