@@ -3,22 +3,26 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <sys/time.h>
+#include <curand_kernel.h>
 
-// Error check macro
 #define gpuErrchk(ans) { gpuAssert((ans), __FILE__, __LINE__); }
 inline void gpuAssert(cudaError_t code, const char *file, int line, bool abort=true) {
-   if (code != cudaSuccess) {
-      fprintf(stderr,"GPUassert: %s %s %d\n", cudaGetErrorString(code), file, line);
-      if (abort) exit(code);
-   }
+    if (code != cudaSuccess) {
+        fprintf(stderr,"GPUassert: %s %s %d\n", cudaGetErrorString(code), file, line);
+        if (abort) exit(code);
+    }
 }
 
-// Kernel to initialize complex data
-__global__ void generateComplexData(cufftDoubleComplex *a, int n) {
+__global__ void initCurand(curandState *state, unsigned long seed) {
+    int idx = threadIdx.x + blockIdx.x * blockDim.x;
+    curand_init(seed, idx, 0, &state[idx]);
+}
+
+__global__ void generateComplexData(cufftDoubleComplex *a, int n, curandState *states) {
     int idx = blockIdx.x * blockDim.x + threadIdx.x;
     if (idx < n) {
-        a[idx].x = rand() / (double)RAND_MAX; // Real part
-        a[idx].y = rand() / (double)RAND_MAX; // Imaginary part
+        a[idx].x = curand_uniform_double(&states[idx]) * 2.0 - 1.0; // Real part
+        a[idx].y = curand_uniform_double(&states[idx]) * 2.0 - 1.0; // Imaginary part
     }
 }
 
@@ -29,32 +33,30 @@ int main() {
     for (int i = 0; i < num_sizes; ++i) {
         int n = sizes[i];
         cufftDoubleComplex *data;
-        cufftHandle plan;
+        curandState *states;
         cudaMalloc(&data, n * sizeof(cufftDoubleComplex));
+        cudaMalloc(&states, n * sizeof(curandState));
 
-        // Generate data on the GPU
-        generateComplexData<<<(n + 255)/256, 256>>>(data, n);
+        initCurand<<<(n + 255)/256, 256>>>(states, time(NULL));
+        generateComplexData<<<(n + 255)/256, 256>>>(data, n, states);
         gpuErrchk(cudaPeekAtLastError());
         gpuErrchk(cudaDeviceSynchronize());
 
-        // Create plan
+        cufftHandle plan;
         if (cufftPlan1d(&plan, n, CUFFT_Z2Z, 1) != CUFFT_SUCCESS) {
             fprintf(stderr, "CUFFT error: Plan creation failed");
             return EXIT_FAILURE;
         }
 
-        // Measure start time
         struct timeval start, end;
         gettimeofday(&start, NULL);
 
-        // Execute FFT
         if (cufftExecZ2Z(plan, data, data, CUFFT_FORWARD) != CUFFT_SUCCESS) {
             fprintf(stderr, "CUFFT error: ExecZ2Z failed");
             return EXIT_FAILURE;
         }
         gpuErrchk(cudaDeviceSynchronize());
 
-        // Measure end time
         gettimeofday(&end, NULL);
         long seconds = (end.tv_sec - start.tv_sec);
         long micros = ((seconds * 1000000) + end.tv_usec) - (start.tv_usec);
@@ -63,6 +65,7 @@ int main() {
 
         cufftDestroy(plan);
         cudaFree(data);
+        cudaFree(states);
     }
 
     return 0;
