@@ -6,7 +6,6 @@
 #include <curand_kernel.h>
 
 /* 
-    Add the following information in comment:
     export PATH=$PATH:/usr/local/cuda-11.4/bin
     export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/usr/local/cuda-11.4/lib64
     nvcc -o fft_cuda_1 fft_cuda_1.cu -lcufft -lcurand
