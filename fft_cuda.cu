@@ -6,7 +6,6 @@
 #include <stdbool.h>
 #include <math.h>
 #include <cuda_runtime.h>
-#include <device_launch_parameters.h>
 #include <cuComplex.h>
 
 __device__ int reverseBits(int num, int log2n) {
@@ -18,11 +17,15 @@ __device__ int reverseBits(int num, int log2n) {
     return reversed;
 }
 
-__global__ void bitReverseCopy(cuDoubleComplex* a, cuDoubleComplex* b, int n, int log2n) {
+__global__ void bitReverse(cuDoubleComplex* a, int n, int log2n) {
     int tid = blockIdx.x * blockDim.x + threadIdx.x;
     if (tid < n) {
         int rev = reverseBits(tid, log2n);
-        b[rev] = a[tid];
+        if (tid < rev) {
+            cuDoubleComplex temp = a[tid];
+            a[tid] = a[rev];
+            a[rev] = temp;
+        }
     }
 }
 
@@ -62,12 +65,8 @@ void fft(cuDoubleComplex *h_a, int n, bool invert) {
     dim3 block(1024);
     dim3 grid((n + block.x - 1) / block.x);
 
-    cuDoubleComplex *d_temp;
-    cudaMalloc(&d_temp, n * sizeof(cuDoubleComplex));
-    bitReverseCopy<<<grid, block>>>(d_a, d_temp, n, log2n);
-    cudaMemcpy(d_a, d_temp, n * sizeof(cuDoubleComplex), cudaMemcpyDeviceToDevice);
-
-    fftKernel<<<grid, block>>>(d_a, n, invert);
+    bitReverse<<<grid, block>>>(d_a, n, log2n);
+    fftKernel<<<grid, block>>>(d_a, n, false);
 
     if (invert) {
         normalize<<<grid, block>>>(d_a, n);
@@ -75,7 +74,6 @@ void fft(cuDoubleComplex *h_a, int n, bool invert) {
 
     cudaMemcpy(h_a, d_a, n * sizeof(cuDoubleComplex), cudaMemcpyDeviceToHost);
     cudaFree(d_a);
-    cudaFree(d_temp);
 }
 
 // Function to generate complex data
