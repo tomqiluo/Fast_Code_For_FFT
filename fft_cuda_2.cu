@@ -24,27 +24,44 @@ __global__ void bitReverseCopy(cuDoubleComplex* a, cuDoubleComplex* b, int n, in
 }
 
 __global__ void fftKernel(cuDoubleComplex* a, int n, bool invert) {
+    extern __shared__ cuDoubleComplex temp[];
+
     int tid = blockIdx.x * blockDim.x + threadIdx.x;
     int numThreads = blockDim.x * gridDim.x;
 
-    extern __shared__ cuDoubleComplex sdata[];
-
     for (int len = 2; len <= n; len <<= 1) {
-        double ang = 2 * M_PI * (invert ? -1 : 1) / (double)len;
+        int halfLen = len / 2;
+        double ang = 2 * M_PI * (invert ? -1 : 1) / len;
         cuDoubleComplex wlen = make_cuDoubleComplex(cos(ang), sin(ang));
-        for (int i = tid; i < n; i += numThreads * len) {
-            cuDoubleComplex w = make_cuDoubleComplex(1, 0);
-            for (int j = 0; j < len / 2; j++) {
-                sdata[j] = a[i + j + len / 2];
-                __syncthreads();  // Ensure all data is loaded
 
-                cuDoubleComplex u = a[i + j];
-                cuDoubleComplex v = cuCmul(sdata[j], w);
-                a[i + j] = cuCadd(u, v);
-                a[i + j + len / 2] = cuCsub(u, v);
-                w = cuCmul(w, wlen);
+        for (int i = tid; i < n; i += numThreads * len) {
+            for (int j = 0; j < halfLen; ++j) {
+                int index1 = i + j;
+                int index2 = i + j + halfLen;
+
+                // Load the data into shared memory
+                temp[threadIdx.x * 2] = a[index1];
+                temp[threadIdx.x * 2 + 1] = a[index2];
+
+                __syncthreads(); // Make sure all writes to shared memory are done
+
+                cuDoubleComplex u = temp[threadIdx.x * 2];
+                cuDoubleComplex t = temp[threadIdx.x * 2 + 1];
+                cuDoubleComplex w = make_cuDoubleComplex(1, 0);
                 
-                __syncthreads();  // Sync before next usage of shared memory
+                // Perform the twiddle factor multiplication on a single element
+                cuDoubleComplex twiddled = cuCmul(w, t);
+
+                // Save the results back into global memory
+                a[index1] = cuCadd(u, twiddled);
+                a[index2] = cuCsub(u, twiddled);
+
+                // Update the twiddle factor
+                if (j != 0) {
+                    w = cuCmul(w, wlen);
+                }
+                
+                __syncthreads(); // Sync before the next iteration
             }
         }
     }
@@ -71,7 +88,8 @@ void fft(cuDoubleComplex *h_a, int n, bool invert) {
     bitReverseCopy<<<grid, block>>>(d_a, d_temp, n, log2n);
     cudaMemcpy(d_a, d_temp, n * sizeof(cuDoubleComplex), cudaMemcpyDeviceToDevice);
 
-    fftKernel<<<grid, block, n * sizeof(cuDoubleComplex) / 2>>>(d_a, n, invert);  // Allocate shared memory
+    int sharedSize = sizeof(cuDoubleComplex) * block.x * 2; // Allocate twice the block size for pair storage
+    fftKernel<<<grid, block, sharedSize>>>(d_a, n, invert);
 
     if (invert) {
         normalize<<<grid, block>>>(d_a, n);
