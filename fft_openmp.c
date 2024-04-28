@@ -83,56 +83,6 @@ void fft_omp(ComplexData* restrict a, int n, bool invert) {
     }
 }
 
-// Your FFT function declaration
-
-// void fft(ComplexData *a, int n, bool invert) {
-//     int i, j, len;
-    
-//     // Bit-reversal section remains unchanged but outside the parallel region
-//     #pragma omp parallel for schedule(static) private(i, j, bit, temp) shared(a, n) num_threads(omp_get_max_threads())
-//     for (i = 1, j = 0; i < n; i++) {
-//         int bit = n >> 1;
-//         for (; j & bit; bit >>= 1)
-//             j ^= bit;
-//         j ^= bit;
-
-//         if (i < j) {
-//             ComplexData temp = a[i];
-//             a[i] = a[j];
-//             a[j] = temp;
-//         }
-//     }
-    
-//     // Start a single parallel region
-
-//     {
-//         // Parallelized FFT computation sections
-//         for (len = 2; len <= n; len <<= 1) {
-//             double ang = 2 * M_PI / len * (invert ? -1 : 1);
-//             ComplexData wlen = cexp(I * ang);
-
-//             #pragma omp for
-//             for (i = 0; i < n; i += len) {
-//                 ComplexData w = 1.0;
-//                 for (j = 0; j < len / 2; j++) {
-//                     ComplexData u = a[i + j];
-//                     ComplexData v = a[i + j + len / 2] * w;
-//                     a[i + j] = u + v;
-//                     a[i + j + len / 2] = u - v;
-//                     w *= wlen;
-//                 }
-//             }
-//         }
-
-//         // Inverse FFT normalization, if necessary
-//         if (invert) {
-//             #pragma omp for
-//             for (i = 0; i < n; i++)
-//                 a[i] /= n;
-//         }
-//     }
-// }
-
 // Function to generate complex data
 void generateComplexData(ComplexData *a, int n) {
     for (int i = 0; i < n; ++i) {
