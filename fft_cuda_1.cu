@@ -5,6 +5,12 @@
 #include <sys/time.h>
 #include <curand_kernel.h>
 
+// Add the following information in comment:
+// export PATH=$PATH:/usr/local/cuda-11.4/bin
+// export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/usr/local/cuda-11.4/lib64
+// Compile: nvcc -o fft_cuda_1 fft_cuda_1.cu -lcufft -lcurand
+// ./fft_cuda_1
+
 #define gpuErrchk(ans) { gpuAssert((ans), __FILE__, __LINE__); }
 inline void gpuAssert(cudaError_t code, const char *file, int line, bool abort=true) {
     if (code != cudaSuccess) {
