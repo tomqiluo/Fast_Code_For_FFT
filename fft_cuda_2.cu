@@ -83,6 +83,13 @@ void fft(cuDoubleComplex *h_a, int n, bool invert) {
     cudaFree(d_a);
     cudaFree(d_temp);
 }
+__global__ void generateComplexData(cufftDoubleComplex *a, int n, curandState *states) {
+    int idx = blockIdx.x * blockDim.x + threadIdx.x;
+    if (idx < n) {
+        a[idx].x = curand_uniform_double(&states[idx]) * 2.0 - 1.0; // Real part
+        a[idx].y = curand_uniform_double(&states[idx]) * 2.0 - 1.0; // Imaginary part
+    }
+}
 
 int main() {
     int sizes[] = {256, 512, 1024,2048,4096,8192,16384,32768,65536,131072,262144,524288,1048576,2097152,4194304,8388608};
