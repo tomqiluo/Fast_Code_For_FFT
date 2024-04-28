@@ -85,7 +85,7 @@ void fft(cuDoubleComplex *h_a, int n, bool invert) {
     if (invert) {
         normalize<<<grid, block>>>(d_a, n);
     }
-
+    cudaCheckError(cudaMalloc(&d_a, n * sizeof(cuDoubleComplex)));
     cudaMemcpy(h_a, d_a, n * sizeof(cuDoubleComplex), cudaMemcpyDeviceToHost);
     cudaFree(d_a);
     cudaFree(d_temp);
@@ -119,7 +119,7 @@ int main() {
         gettimeofday(&end, NULL);
         long seconds = (end.tv_sec - start.tv_sec);
         long micros = ((seconds * 1000000) + end.tv_usec) - (start.tv_usec);
-        cudaCheckError(cudaMalloc(&d_a, n * sizeof(cuDoubleComplex)));
+
         printf("FFT size %d - Execution time: %ld microseconds\n", n, micros);
 
         free(data);
