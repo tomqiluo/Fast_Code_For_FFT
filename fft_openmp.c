@@ -6,7 +6,7 @@
 #include <math.h>
 #include <omp.h>
 
-#define M_PI 3.14159265358979323846
+#define PI 3.14159265358979323846
 
 // Assume ComplexData is defined as:
 typedef double complex ComplexData;
@@ -107,7 +107,7 @@ int main() {
         gettimeofday(&start, NULL);
         
         // Run FFT
-        fft(data, n, false);
+        fft_omp(data, n, false);
         
         // Measure end time
         gettimeofday(&end, NULL);
