@@ -6,6 +6,15 @@
 #include <device_launch_parameters.h>
 #include <cuComplex.h>
 
+
+#define cudaCheckError(ans) { cudaAssert((ans), __FILE__, __LINE__); }
+inline void cudaAssert(cudaError_t code, const char *file, int line, bool abort=true) {
+   if (code != cudaSuccess) {
+      fprintf(stderr,"CUDA Error: %s at %s:%d\n", cudaGetErrorString(code), file, line);
+      if (abort) exit(code);
+   }
+}
+
 __device__ int reverseBits(int num, int log2n) {
     int reversed = 0;
     for (int i = 0; i < log2n; i++) {
@@ -110,7 +119,7 @@ int main() {
         gettimeofday(&end, NULL);
         long seconds = (end.tv_sec - start.tv_sec);
         long micros = ((seconds * 1000000) + end.tv_usec) - (start.tv_usec);
-
+        cudaCheckError(cudaMalloc(&d_a, n * sizeof(cuDoubleComplex)));
         printf("FFT size %d - Execution time: %ld microseconds\n", n, micros);
 
         free(data);
