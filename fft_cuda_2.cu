@@ -23,7 +23,6 @@ __global__ void bitReverseCopy(cuDoubleComplex* a, cuDoubleComplex* b, int n, in
     }
 }
 
-// Utilizing shared memory for intermediate calculations
 __global__ void fftKernel(cuDoubleComplex* a, int n, bool invert) {
     int tid = blockIdx.x * blockDim.x + threadIdx.x;
     int numThreads = blockDim.x * gridDim.x;
@@ -36,8 +35,8 @@ __global__ void fftKernel(cuDoubleComplex* a, int n, bool invert) {
         for (int i = tid; i < n; i += numThreads * len) {
             cuDoubleComplex w = make_cuDoubleComplex(1, 0);
             for (int j = 0; j < len / 2; j++) {
-                sdata[j] = a[i + j + len / 2];  // Load into shared memory
-                __syncthreads();  // Synchronize to ensure all data is loaded
+                sdata[j] = a[i + j + len / 2];
+                __syncthreads();  // Ensure all data is loaded
 
                 cuDoubleComplex u = a[i + j];
                 cuDoubleComplex v = cuCmul(sdata[j], w);
@@ -45,13 +44,12 @@ __global__ void fftKernel(cuDoubleComplex* a, int n, bool invert) {
                 a[i + j + len / 2] = cuCsub(u, v);
                 w = cuCmul(w, wlen);
                 
-                __syncthreads();  // Synchronize before next usage of shared memory
+                __syncthreads();  // Sync before next usage of shared memory
             }
         }
     }
 }
 
-// Reduce the normalization to a simple division
 __global__ void normalize(cuDoubleComplex* a, int n) {
     int index = blockIdx.x * blockDim.x + threadIdx.x;
     if (index < n) {
@@ -73,7 +71,7 @@ void fft(cuDoubleComplex *h_a, int n, bool invert) {
     bitReverseCopy<<<grid, block>>>(d_a, d_temp, n, log2n);
     cudaMemcpy(d_a, d_temp, n * sizeof(cuDoubleComplex), cudaMemcpyDeviceToDevice);
 
-    fftKernel<<<grid, block, n * sizeof(cuDoubleComplex) / 2>>>(d_a, n, invert);  // Passing half of n elements for shared memory
+    fftKernel<<<grid, block, n * sizeof(cuDoubleComplex) / 2>>>(d_a, n, invert);  // Allocate shared memory
 
     if (invert) {
         normalize<<<grid, block>>>(d_a, n);
@@ -83,36 +81,32 @@ void fft(cuDoubleComplex *h_a, int n, bool invert) {
     cudaFree(d_a);
     cudaFree(d_temp);
 }
-__global__ void generateComplexData(cufftDoubleComplex *a, int n, curandState *states) {
-    int idx = blockIdx.x * blockDim.x + threadIdx.x;
-    if (idx < n) {
-        a[idx].x = curand_uniform_double(&states[idx]) * 2.0 - 1.0; // Real part
-        a[idx].y = curand_uniform_double(&states[idx]) * 2.0 - 1.0; // Imaginary part
+
+void generateComplexData(cuDoubleComplex *a, int n) {
+    for (int i = 0; i < n; ++i) {
+        double real = static_cast<double>(rand()) / RAND_MAX;
+        double imag = static_cast<double>(rand()) / RAND_MAX;
+        a[i] = make_cuDoubleComplex(real, imag);
     }
 }
 
 int main() {
-    int sizes[] = {256, 512, 1024,2048,4096,8192,16384,32768,65536,131072,262144,524288,1048576,2097152,4194304,8388608};
+    int sizes[] = {256, 512, 1024, 2048, 4096, 8192, 16384, 32768, 65536, 131072, 262144, 524288, 1048576, 2097152, 4194304, 8388608};
     int num_sizes = sizeof(sizes) / sizeof(sizes[0]);
 
-    // Initialize cuda
-    cudaFree(0);
+    cudaFree(0);  // Initialize CUDA
 
     for (int i = 0; i < num_sizes; ++i) {
         int n = sizes[i];
         cuDoubleComplex *data = (cuDoubleComplex *)malloc(n * sizeof(cuDoubleComplex));
 
-        // Generate data
         generateComplexData(data, n);
 
-        // Measure start time
         struct timeval start, end;
         gettimeofday(&start, NULL);
         
-        // Run FFT
         fft(data, n, false);
         
-        // Measure end time
         gettimeofday(&end, NULL);
         long seconds = (end.tv_sec - start.tv_sec);
         long micros = ((seconds * 1000000) + end.tv_usec) - (start.tv_usec);
