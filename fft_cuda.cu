@@ -18,36 +18,68 @@ __device__ int reverseBits(int num, int log2n) {
 }
 
 __global__ void bitReverse(cuDoubleComplex* a, int n, int log2n) {
+    extern __shared__ cuDoubleComplex shared_a[];
+
     int tid = blockIdx.x * blockDim.x + threadIdx.x;
+    int local_id = threadIdx.x;
+
+    // Load data into shared memory
     if (tid < n) {
-        int rev = reverseBits(tid, log2n);
-        if (tid < rev) {
-            cuDoubleComplex temp = a[tid];
-            a[tid] = a[rev];
-            a[rev] = temp;
-        }
+        shared_a[local_id] = a[tid];
+    }
+    __syncthreads();
+
+    // Perform bit reversal in shared memory
+    int rev = reverseBits(local_id, log2n);
+    if (local_id < rev) {
+        cuDoubleComplex temp = shared_a[local_id];
+        shared_a[local_id] = shared_a[rev];
+        shared_a[rev] = temp;
+    }
+    __syncthreads();
+
+    // Write data back to global memory
+    if (tid < n) {
+        a[tid] = shared_a[local_id];
     }
 }
 
-__global__ void fftKernel(cuDoubleComplex* a, int n, bool invert) {
-    int tid = blockIdx.x * blockDim.x + threadIdx.x;
-    int numThreads = blockDim.x * gridDim.x;;
 
+__global__ void fftKernel(cuDoubleComplex* a, int n, bool invert) {
+    extern __shared__ cuDoubleComplex shared_a[];
+    int tid = blockIdx.x * blockDim.x + threadIdx.x;
+    int local_id = threadIdx.x;
+
+    // Load data into shared memory
+    if (tid < n) {
+        shared_a[local_id] = a[tid];
+    }
+    __syncthreads();
+
+    int numThreads = blockDim.x * gridDim.x;
     for (int len = 2; len <= n; len <<= 1) {
-        double ang = 2 * 3.1415926 * (invert ? -1 : 1) / (double)len;
+        double ang = 2 * M_PI * (invert ? -1 : 1) / len;
         cuDoubleComplex wlen = make_cuDoubleComplex(cos(ang), sin(ang));
-        for (int i = tid; i < n; i += numThreads * len) {
+
+        for (int i = local_id; i < n; i += numThreads * len) {
             cuDoubleComplex w = make_cuDoubleComplex(1, 0);
-            for (int j = 0; j < len>>1; j++) {
-                cuDoubleComplex u = a[i + j];
-                cuDoubleComplex v = cuCmul(a[i + j + len>>1], w);
-                a[i + j] = cuCadd(u, v);
-                a[i + j + len>>1] = cuCsub(u, v);
+            for (int j = 0; j < len / 2; j++) {
+                cuDoubleComplex u = shared_a[i + j];
+                cuDoubleComplex v = cuCmul(shared_a[i + j + len / 2], w);
+                shared_a[i + j] = cuCadd(u, v);
+                shared_a[i + j + len / 2] = cuCsub(u, v);
                 w = cuCmul(w, wlen);
             }
         }
+        __syncthreads();
+    }
+
+    // Write data back to global memory
+    if (tid < n) {
+        a[tid] = shared_a[local_id];
     }
 }
+
 
 __global__ void normalize(cuDoubleComplex* a, int n) {
     int index = blockIdx.x * blockDim.x + threadIdx.x;
@@ -62,14 +94,15 @@ void fft(cuDoubleComplex *h_a, int n, bool invert) {
     cudaMemcpy(d_a, h_a, n * sizeof(cuDoubleComplex), cudaMemcpyHostToDevice);
 
     int log2n = log2((double)n);
-    dim3 block(1024);
-    dim3 grid((n + block.x - 1) / block.x);
+    int blockSize = 4096; // This can be adjusted based on device capabilities
+    int numBlocks = (n + blockSize - 1) / blockSize;
+    size_t sharedSize = blockSize * sizeof(cuDoubleComplex);
 
-    bitReverse<<<grid, block>>>(d_a, n, log2n);
-    fftKernel<<<grid, block>>>(d_a, n, false);
+    bitReverse<<<numBlocks, blockSize, sharedSize>>>(d_a, n, log2n);
+    fftKernel<<<numBlocks, blockSize, sharedSize>>>(d_a, n, false);
 
     if (invert) {
-        normalize<<<grid, block>>>(d_a, n);
+        normalize<<<numBlocks, blockSize, sharedSize>>>(d_a, n);
     }
 
     cudaMemcpy(h_a, d_a, n * sizeof(cuDoubleComplex), cudaMemcpyDeviceToHost);
