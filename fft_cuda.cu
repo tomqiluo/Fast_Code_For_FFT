@@ -1,4 +1,4 @@
-//nvcc -x cu fft_cuda.cpp -Xcompiler -fopenmp -o fft_cuda.x -arch=sm_70 -std=c++11
+// nvcc -o fft_cuda fft_cuda.cu -arch=compute_75 -code=sm_75 -use_fast_math -O3
 #include <stdio.h>
 #include <stdlib.h>
 #include <sys/time.h>
@@ -8,7 +8,6 @@
 #include <cuda_runtime.h>
 #include <device_launch_parameters.h>
 #include <cuComplex.h>
-#include <math_constants.h>
 
 __device__ int reverseBits(int num, int log2n) {
     int reversed = 0;
@@ -29,22 +28,18 @@ __global__ void bitReverseCopy(cuDoubleComplex* a, cuDoubleComplex* b, int n, in
 
 __global__ void fftKernel(cuDoubleComplex* a, int n, bool invert) {
     int tid = blockIdx.x * blockDim.x + threadIdx.x;
-    int numThreads = blockDim.x * gridDim.x;
-    int len, halfLen, base;
-    double angle;
-    cuDoubleComplex wlen, w, u, v;
+    int numThreads = blockDim.x * gridDim.x;;
 
-    for (len = 2; len <= n; len <<= 1) {
-        halfLen = len >> 1;
-        angle = 2 * CUDART_PI * (invert ? -1 : 1) / (double)len;
-        wlen = make_cuDoubleComplex(cos(angle), sin(angle));
-        for (base = tid; base < n; base += numThreads * len) {
-            w = make_cuDoubleComplex(1, 0);
-            for (int j = 0; j < halfLen; j++) {
-                u = a[base + j];
-                v = cuCmul(a[base + j + halfLen], w);
-                a[base + j] = cuCadd(u, v);
-                a[base + j + halfLen] = cuCsub(u, v);
+    for (int len = 2; len <= n; len <<= 1) {
+        double ang = 2 * 3.1415926 * (invert ? -1 : 1) / (double)len;
+        cuDoubleComplex wlen = make_cuDoubleComplex(cos(ang), sin(ang));
+        for (int i = tid; i < n; i += numThreads * len) {
+            cuDoubleComplex w = make_cuDoubleComplex(1, 0);
+            for (int j = 0; j < len>>1; j++) {
+                cuDoubleComplex u = a[i + j];
+                cuDoubleComplex v = cuCmul(a[i + j + len>>1], w);
+                a[i + j] = cuCadd(u, v);
+                a[i + j + len>>1] = cuCsub(u, v);
                 w = cuCmul(w, wlen);
             }
         }
@@ -86,16 +81,18 @@ void fft(cuDoubleComplex *h_a, int n, bool invert) {
 // Function to generate complex data
 void generateComplexData(cuDoubleComplex *a, int n) {
     for (int i = 0; i < n; ++i) {
-        a[i] = make_cuDoubleComplex(
-            (rand() / (double)RAND_MAX),
-            (rand() / (double)RAND_MAX)
-        );
+        double real = static_cast<double>(rand()) / RAND_MAX;
+        double imag = static_cast<double>(rand()) / RAND_MAX;
+        a[i] = make_cuDoubleComplex(real, imag);
     }
 }
 
 int main() {
     int sizes[] = {256, 512, 1024,2048,4096,8192,16384,32768,65536,131072,262144,524288,1048576,2097152,4194304,8388608};
     int num_sizes = sizeof(sizes) / sizeof(sizes[0]);
+
+    // Initialize cuda
+    cudaFree(0);
 
     for (int i = 0; i < num_sizes; ++i) {
         int n = sizes[i];
