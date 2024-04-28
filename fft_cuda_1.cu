@@ -5,11 +5,13 @@
 #include <sys/time.h>
 #include <curand_kernel.h>
 
-// Add the following information in comment:
-// export PATH=$PATH:/usr/local/cuda-11.4/bin
-// export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/usr/local/cuda-11.4/lib64
-// Compile: nvcc -o fft_cuda_1 fft_cuda_1.cu -lcufft -lcurand
-// ./fft_cuda_1
+/* 
+    Add the following information in comment:
+    export PATH=$PATH:/usr/local/cuda-11.4/bin
+    export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/usr/local/cuda-11.4/lib64
+    nvcc -o fft_cuda_1 fft_cuda_1.cu -lcufft -lcurand
+    ./fft_cuda_1
+*/
 
 #define gpuErrchk(ans) { gpuAssert((ans), __FILE__, __LINE__); }
 inline void gpuAssert(cudaError_t code, const char *file, int line, bool abort=true) {
@@ -35,7 +37,7 @@ __global__ void generateComplexData(cufftDoubleComplex *a, int n, curandState *s
 int main() {
     int sizes[] = {256, 512, 1024, 2048, 4096, 8192, 16384, 32768, 65536, 131072, 262144, 524288, 1048576, 2097152, 4194304, 8388608};
     int num_sizes = sizeof(sizes) / sizeof(sizes[0]);
-    
+
     for (int i = 0; i < num_sizes; ++i) {
         int n = sizes[i];
         cufftDoubleComplex *data;

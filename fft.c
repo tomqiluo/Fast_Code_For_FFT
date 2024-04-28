@@ -5,6 +5,8 @@
 #include <stdbool.h>
 #include <math.h>
 
+// gcc -std=c99 fft.c -o fft.x -lm
+
 typedef double complex ComplexData;
 
 void fft(ComplexData *a, int n, bool invert) {
