@@ -6,6 +6,8 @@
 #include <math.h>
 #include <omp.h>
 
+// gcc -std=c99 fft_openmp.c -o fft_openmp.x -lm -Ofast -march=native -mtune=native -ffast-math -funroll-loops
+
 #define PI 3.14159265358979323846
 
 // Assume ComplexData is defined as:
